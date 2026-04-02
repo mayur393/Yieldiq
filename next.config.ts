@@ -35,6 +35,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '5mb',
     },
   },
+  serverExternalPackages: [
+    '@opentelemetry/exporter-jaeger',
+    '@opentelemetry/sdk-node',
+    '@opentelemetry/api'
+  ],
 };
 
 export default nextConfig;
