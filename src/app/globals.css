@@ -1,0 +1,113 @@
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet map styles */
+
+@layer base {
+  :root {
+    --background: 100 20% 97%;
+    --foreground: 120 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 120 10% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 120 10% 10%;
+    --primary: 98 60% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 100 30% 92%;
+    --secondary-foreground: 98 60% 25%;
+    --muted: 100 10% 90%;
+    --muted-foreground: 120 5% 40%;
+    --accent: 109 81% 60%;
+    --accent-foreground: 120 10% 10%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 120 10% 90%;
+    --input: 120 10% 90%;
+    --ring: 98 60% 40%;
+    --radius: 0.75rem;
+    --chart-1: 98 60% 40%;
+    --chart-2: 109 81% 60%;
+    --chart-3: 160 60% 45%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --sidebar-background: 100 20% 95%;
+    --sidebar-foreground: 120 10% 20%;
+    --sidebar-primary: 98 60% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 100 30% 90%;
+    --sidebar-accent-foreground: 98 60% 20%;
+    --sidebar-border: 120 10% 88%;
+    --sidebar-ring: 98 60% 40%;
+  }
+  .dark {
+    --background: 120 10% 5%;
+    --foreground: 100 10% 95%;
+    --card: 120 10% 8%;
+    --card-foreground: 100 10% 95%;
+    --popover: 120 10% 8%;
+    --popover-foreground: 100 10% 95%;
+    --primary: 98 60% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 120 10% 15%;
+    --secondary-foreground: 100 10% 95%;
+    --muted: 120 10% 15%;
+    --muted-foreground: 120 5% 65%;
+    --accent: 109 81% 50%;
+    --accent-foreground: 120 10% 5%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 120 10% 15%;
+    --input: 120 10% 15%;
+    --ring: 98 60% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
+}
+
+/* Custom Leaflet Styles — YieldIQ Theme */
+.plot-tooltip {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #1a1a1a !important;
+  padding: 4px 8px !important;
+  white-space: nowrap;
+}
+.plot-tooltip::before { display: none !important; }
+
+.yieldiq-popup .leaflet-popup-content-wrapper {
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 0;
+  overflow: hidden;
+}
+.yieldiq-popup .leaflet-popup-content {
+  margin: 0;
+  width: auto !important;
+}
+.yieldiq-popup .leaflet-popup-tip-container { display: none; }
+
+.leaflet-control-layers {
+  border-radius: 8px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  font-size: 12px;
+}
+.leaflet-control-zoom a {
+  border-radius: 6px !important;
+}
