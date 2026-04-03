@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { checkIsAdminAction } from "@/app/actions/admin";
 
 export const authOptions: any = {
   providers: [
@@ -51,12 +52,19 @@ export const authOptions: any = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        
+        // Initial Admin Check
+        const isAdmin = await checkIsAdminAction(user.email);
+        if (isAdmin) {
+          token.role = 'admin';
+        }
       }
       return token;
     },
     async session({ session, token }: { session: any; token: any }) {
       if (session.user) {
         session.user.id = token.id;
+        session.user.role = token.role || 'user';
       }
       return session;
     },

@@ -11,6 +11,8 @@ import { MapPin, Sprout, Database, Save, Loader2, AlertCircle, RefreshCw, Plus, 
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "next-auth/react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useDemoMode } from "@/components/demo-provider";
+import { DEMO_DATA } from "@/lib/demo-data";
 
 export default function FarmProfilePage() {
   const { data: session } = useSession();
@@ -18,7 +20,7 @@ export default function FarmProfilePage() {
   const { toast } = useToast();
   
   const userUid = user?.uid || (session?.user as any)?.id;
-  
+  const { isDemoMode } = useDemoMode();
   const { data: farmData, isLoading: isFarmLoading, error: farmError } = useFarm(userUid);
 
   const [formData, setFormData] = useState({
@@ -34,6 +36,17 @@ export default function FarmProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    if (isDemoMode) {
+      setFormData({
+        name: DEMO_DATA.farm.name,
+        location: DEMO_DATA.farm.location,
+        totalAreaHectares: DEMO_DATA.farm.total_area_hectares,
+        numberOfPlots: DEMO_DATA.farm.number_of_plots,
+        plots: DEMO_DATA.farm.plots.map(p => ({ ...p, area: p.area || 0 })),
+      });
+      return;
+    }
+
     if (farmData) {
       setFormData({
         name: farmData.name || "",
@@ -45,7 +58,7 @@ export default function FarmProfilePage() {
         ]
       });
     }
-  }, [farmData]);
+  }, [farmData, isDemoMode]);
 
   const handlePlotsChange = (val: number) => {
     setFormData(prev => {
@@ -126,11 +139,21 @@ export default function FarmProfilePage() {
           <h1 className="text-2xl font-bold font-headline">Farm Profile</h1>
           <p className="text-muted-foreground">Manage your master farm and individual plot configurations.</p>
         </div>
-        <div className="hidden sm:flex items-center gap-2 text-[10px] bg-muted px-2 py-1 rounded border">
+        <div className="flex items-center gap-2 text-[10px] bg-muted px-2 py-1 rounded border">
           <Database className="h-3 w-3" />
-          <span>Cloud Sync Active</span>
+          <span>{isDemoMode ? "Demo Mode Active" : "Cloud Sync Active"}</span>
         </div>
       </div>
+
+      {isDemoMode && (
+         <Alert className="bg-primary/10 border-primary/20 mb-6">
+            <AlertCircle className="h-4 w-4 text-primary" />
+            <AlertTitle className="font-bold">Demo Mode Active</AlertTitle>
+            <AlertDescription>
+              Currently viewing mock farm data. Changes made in demo mode are not saved to the cloud.
+            </AlertDescription>
+         </Alert>
+      )}
 
       {farmError && (
         <Alert variant="destructive" className="bg-destructive/5">
@@ -265,9 +288,9 @@ export default function FarmProfilePage() {
 
         <div className="flex justify-end gap-4 mt-6">
           <Button variant="outline" onClick={() => window.location.reload()}>Discard Changes</Button>
-          <Button className="bg-primary hover:bg-primary/90 min-w-[140px]" onClick={handleSave} disabled={isSaving}>
+           <Button className="bg-primary hover:bg-primary/90 min-w-[140px]" onClick={handleSave} disabled={isSaving || isDemoMode}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Save to Cloud
+            {isDemoMode ? "Demo (No Save)" : "Save to Cloud"}
           </Button>
         </div>
       </div>

@@ -3,7 +3,7 @@
     {
       "id": "hero-farm",
       "description": "Lush green wheat field during sunset",
-      "imageUrl": "https://picsum.photos/seed/farm1/1200/600",
+      "imageUrl": "/hero-farm-modern.png",
       "imageHint": "green farm"
     },
     {

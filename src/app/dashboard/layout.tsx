@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
+import { DemoProvider, useDemoMode } from "@/components/demo-provider";
 import { Leaf, User, LogOut, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -50,7 +51,8 @@ export default function DashboardLayout({
   const user = session?.user;
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <DemoProvider>
+      <div className="flex min-h-screen bg-background">
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex w-64 flex-col border-r bg-sidebar">
         <div className="flex h-16 items-center border-b px-6">
@@ -83,8 +85,9 @@ export default function DashboardLayout({
             <Leaf className="h-6 w-6 text-primary" />
             <span className="font-bold font-headline">YieldIQ</span>
           </div>
-          <div className="hidden md:block">
+          <div className="hidden md:flex items-center gap-4">
             <h2 className="text-lg font-semibold font-headline">Dashboard</h2>
+            <DemoToggle />
           </div>
           <div className="flex items-center gap-4">
             <DropdownMenu>
@@ -115,6 +118,22 @@ export default function DashboardLayout({
           </div>
         </main>
       </div>
+      </div>
+    </DemoProvider>
+  );
+}
+
+function DemoToggle() {
+  const { isDemoMode, toggleDemoMode } = useDemoMode();
+  return (
+    <div className="flex items-center gap-2 border rounded-full px-3 py-1 bg-secondary/30">
+       <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Demo</span>
+       <button 
+         onClick={toggleDemoMode}
+         className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${isDemoMode ? 'bg-primary' : 'bg-muted'}`}
+       >
+         <span aria-hidden="true" className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isDemoMode ? 'translate-x-4' : 'translate-x-0'}`} />
+       </button>
     </div>
   );
 }

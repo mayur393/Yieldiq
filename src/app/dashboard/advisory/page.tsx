@@ -28,6 +28,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
+import { useDemoMode } from "@/components/demo-provider";
+import { DEMO_DATA } from "@/lib/demo-data";
 
 // Helper: detect Gemini quota/rate-limit errors
 function isQuotaError(error: any): boolean {
@@ -40,6 +42,21 @@ function isQuotaError(error: any): boolean {
   );
 }
 
+// Helper: Create a unique string based on plot variables that affect AI logic
+function generatePlotFingerprint(plot: any) {
+  if (!plot) return "";
+  return [
+    plot.cropType,
+    plot.plantingDate,
+    plot.growthStage,
+    plot.variety,
+    plot.soilType,
+    plot.area,
+    // Add lab report info if available to ensure we re-run if a report is added
+    plot.lastComputedInsights ? "with-insights" : "no-insights"
+  ].join("|");
+}
+
 export default function AdvisoryPage() {
   const { data: session } = useSession();
   const { user } = useUser();
@@ -49,6 +66,8 @@ export default function AdvisoryPage() {
   const userUid = user?.uid || (session?.user as any)?.id;
 
   const { data: farmData } = useFarm(userUid);
+
+  const { isDemoMode } = useDemoMode();
 
   const [localFarm, setLocalFarm] = useState<any>(null);
   
@@ -61,41 +80,67 @@ export default function AdvisoryPage() {
     } catch (e) {}
   }, []);
   
-  const activeData = farmData || localFarm;
+  const activeData = isDemoMode ? DEMO_DATA.farm : (farmData || localFarm);
   const plots = activeData?.plots || [];
   const [selectedPlotIndex, setSelectedPlotIndex] = useState<string>("0");
-  const currentPlot = plots[parseInt(selectedPlotIndex)];
+  const currentPlotRaw = plots[parseInt(selectedPlotIndex)];
+
+  // For demo mode, inject a detailed report if it's missing but we want to show one
+  const currentPlot = isDemoMode && currentPlotRaw?.lastComputedInsights 
+    ? { ...currentPlotRaw, latestAdvisory: { ...currentPlotRaw.latestAdvisory, detailedReport: DEMO_DATA.advisory.detailedReport } }
+    : currentPlotRaw;
 
   const handleGenerateReport = async () => {
     if (!userUid || !currentPlot) return;
+
+    // Semantic Cache Check
+    const currentFingerprint = generatePlotFingerprint(currentPlot);
+    const existingFingerprint = currentPlot?.latestAdvisory?.fingerprint;
+
+    if (existingFingerprint === currentFingerprint && !isDemoMode) {
+      toast({
+        title: "Report is Up-to-Date",
+        description: "Your current plot data matches the last generated report. No refresh needed.",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     
     try {
-      const idx = parseInt(selectedPlotIndex);
-      const result = await generateInsights(userUid, currentPlot);
-      
-      // PERSIST RESULTS to specific plot (snake_case columns only)
-      if (userUid && activeData) {
-        try {
-          const updatedPlots = [...plots];
-          updatedPlots[idx] = {
-            ...updatedPlots[idx],
-            lastComputedInsights: result.computed,
-            latestAdvisory: result.advisory,
-          };
-          
-          await saveFarmData(userUid, {
-            plots: updatedPlots,
-          });
-        } catch (dbError) {
-          console.error("Supabase persistence error:", dbError);
+      if (isDemoMode) {
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        toast({ title: "Report Generated (Demo)", description: "Demo report updated for pitch." });
+      } else {
+        const idx = parseInt(selectedPlotIndex);
+        const result = await generateInsights(userUid, currentPlot);
+        
+        // PERSIST RESULTS to specific plot (snake_case columns only)
+        if (userUid && activeData) {
+          try {
+            const updatedPlots = [...plots];
+            updatedPlots[idx] = {
+              ...updatedPlots[idx],
+              lastComputedInsights: result.computed,
+              latestAdvisory: {
+                ...result.advisory,
+                fingerprint: currentFingerprint // Store fingerprint for caching
+              },
+            };
+            
+            await saveFarmData(userUid, {
+              plots: updatedPlots,
+            });
+          } catch (dbError) {
+            console.error("Supabase persistence error:", dbError);
+          }
         }
-      }
 
-      toast({
-        title: "Report Generated",
-        description: `Advisory for ${currentPlot.name || 'Plot'} has been updated.`,
-      });
+        toast({
+          title: "Report Generated",
+          description: `Advisory for ${currentPlot.name || 'Plot'} has been updated.`,
+        });
+      }
     } catch (error: any) {
       console.error(error);
       toast({
@@ -132,18 +177,39 @@ export default function AdvisoryPage() {
   }
 
   const currentAdvisory = currentPlot?.latestAdvisory;
+  const currentFingerprint = generatePlotFingerprint(currentPlot);
+  const existingFingerprint = currentAdvisory?.fingerprint;
+  const isStale = !!currentAdvisory && existingFingerprint !== currentFingerprint;
+  const isFresh = !!currentAdvisory && existingFingerprint === currentFingerprint;
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold font-headline text-foreground">Scientific Advisory Report</h1>
-          <p className="text-muted-foreground">Detailed precision guidance derived for your specific plots.</p>
         </div>
-        <Button onClick={handleGenerateReport} disabled={isGenerating} size="lg" className="bg-primary hover:bg-primary/90">
-          {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-          Refresh Plot Insights
-        </Button>
+        <div className="flex items-center gap-3">
+          {isFresh && !isGenerating && (
+            <div className="hidden md:flex items-center gap-1.5 text-[10px] font-bold text-green-600 bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20 uppercase tracking-tighter">
+              <CheckSquare className="h-3 w-3" /> Report Sync: Fresh
+            </div>
+          )}
+          {isStale && !isGenerating && (
+            <div className="hidden md:flex items-center gap-1.5 text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-1 rounded-full border border-amber-500/20 uppercase tracking-tighter">
+              <AlertCircle className="h-3 w-3" /> Data Changed
+            </div>
+          )}
+          <Button 
+            onClick={handleGenerateReport} 
+            disabled={isGenerating} 
+            size="lg" 
+            variant={isFresh ? "outline" : "default"}
+            className={isFresh ? "border-primary/20 text-primary hover:bg-primary/5" : "bg-primary hover:bg-primary/90"}
+          >
+            {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
+            {isFresh ? "Force New Run" : isStale ? "Update Analysis" : "Refresh Plot Insights"}
+          </Button>
+        </div>
       </div>
 
       <Tabs value={selectedPlotIndex} onValueChange={setSelectedPlotIndex} className="w-full">
@@ -158,6 +224,16 @@ export default function AdvisoryPage() {
              </TabsTrigger>
            ))}
         </TabsList>
+
+        {isDemoMode && (
+          <Alert className="bg-primary/10 border-primary/20 mb-6">
+            <Zap className="h-4 w-4 text-primary" />
+            <AlertTitle className="font-bold">Demo Mode Active</AlertTitle>
+            <AlertDescription>
+              Viewing pre-generated AI insights for demonstration purposes.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <TabsContent value={selectedPlotIndex} className="mt-0 outline-none animate-in fade-in">
           

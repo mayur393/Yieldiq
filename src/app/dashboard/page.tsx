@@ -23,15 +23,19 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSession } from "next-auth/react";
 import { Badge } from "@/components/ui/badge";
 import { PlotStatusCard } from "@/components/dashboard/plot-status-card";
+import { useDemoMode } from "@/components/demo-provider";
+import { DEMO_DATA } from "@/lib/demo-data";
 
 export default function Dashboard() {
   const { data: session } = useSession();
   const { user } = useUser();
 
+  const { isDemoMode } = useDemoMode();
+
   // Prefer NextAuth session if user isn't synced yet (for UI only)
-  const displayUser = user || session?.user;
+  const displayUser = isDemoMode ? { name: "Demo Farmer" } : (user || session?.user);
   const userUid = user?.uid || (session?.user as any)?.id;
-  const userName = (displayUser as any)?.name || (displayUser as any)?.displayName || "Farmer";
+  const userName = isDemoMode ? "Demo Farmer" : ((displayUser as any)?.name || (displayUser as any)?.displayName || "Farmer");
 
   const { data: farmData, isLoading: isFarmLoading } = useFarm(userUid);
 
@@ -49,10 +53,12 @@ export default function Dashboard() {
     );
   }
 
-  const hasInsights = !!farmData?.lastComputedInsights;
-  const advisory = farmData?.latestAdvisory;
-  const insights = farmData?.lastComputedInsights;
-  const plots = farmData?.plots || [];
+  const activeFarm = isDemoMode ? DEMO_DATA.farm : farmData;
+  const hasInsights = isDemoMode ? true : !!activeFarm?.lastComputedInsights;
+  const advisory = isDemoMode ? activeFarm?.plots[0]?.latestAdvisory : activeFarm?.latestAdvisory;
+  const plots = activeFarm?.plots || [];
+  const weatherText = isDemoMode ? DEMO_DATA.dashboard.weather : "32°C • Clear";
+  const smartTasks = isDemoMode ? DEMO_DATA.dashboard.smartTasks : advisory?.smartTasks || [];
 
   return (
     <div className="space-y-6">
@@ -68,7 +74,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 bg-secondary/50 px-4 py-2 rounded-lg border border-primary/10">
             <Sun className="h-4 w-4 text-orange-500" />
-            <span className="text-sm font-medium">32°C • Clear</span>
+            <span className="text-sm font-medium">{weatherText}</span>
           </div>
           <div className="flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-lg border border-primary/10">
             <Calendar className="h-4 w-4 text-primary" />
@@ -158,13 +164,13 @@ export default function Dashboard() {
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2">
                Smart Tasks
-               {hasInsights && <Badge className="ml-2 bg-primary">{advisory?.smartTasks?.length}</Badge>}
+               {hasInsights && <Badge className="ml-2 bg-primary">{smartTasks.length}</Badge>}
             </CardTitle>
             <CardDescription>Actions to take right now for better growth.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {hasInsights ? (
-              advisory?.smartTasks?.map((task: any, i: number) => (
+              smartTasks.map((task: any, i: number) => (
                 <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-background hover:border-primary/50 transition-colors group">
                   <div className={`h-8 w-8 rounded flex items-center justify-center shrink-0 ${
                     task.priority === 'High' ? 'bg-destructive/10 text-destructive' : 'bg-secondary text-primary'

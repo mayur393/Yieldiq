@@ -16,87 +16,97 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 /**
- * Validates whether the current session belongs to an admin user.
- * Admin emails are defined in the ADMIN_EMAILS env variable (comma-separated).
+ * Checks if an email is authorized for admin access.
+ * Whitelists emails from .env and the `admin_access` table.
  */
-async function validateAdminSession() {
+export async function checkIsAdminAction(email: string | null | undefined) {
+  if (!email) return false;
+
+  // 1. Check Hardcoded Admins (from .env)
+  const envAdmins = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
+  console.log(`[Admin Debug] Checking: ${email} against:`, envAdmins);
+  
+  if (envAdmins.includes(email.toLowerCase())) {
+    console.log(`[Admin Debug] Match found in .env!`);
+    return true;
+  }
+
+  // 2. Check Database Whitelist (admin_access table)
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("admin_access")
+      .select("email")
+      .eq("email", email.toLowerCase())
+      .single();
+
+    if (!error && data) {
+       console.log(`[Admin Debug] Match found in DB!`);
+       return true;
+    }
+    if (error) console.log(`[Admin Debug] DB Error or No Match:`, error.message);
+  } catch (e) {
+    console.error("Admin check failed (DB):", e);
+  }
+
+  console.log(`[Admin Debug] No admin match found for ${email}`);
+  return false;
+}
+
+/**
+ * Fetches all farms for the Admin Dashboard overview.
+ */
+export async function fetchAllFarmsAdmin() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    throw new Error("Unauthorized: No valid session.");
+  if (!session || (session as any).user?.role !== 'admin') {
+    throw new Error("Unauthorized: Admin access required.");
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (!adminEmails.includes(session.user.email.toLowerCase())) {
-    throw new Error("Forbidden: You do not have admin privileges.");
-  }
-
-  return session;
-}
-
-/**
- * Fetch all users by aggregating data from the farms table.
- * Groups results by owner_id to produce a list of unique users.
- */
-export async function adminFetchAllUsersAction() {
-  await validateAdminSession();
-
-  const { data: farms, error } = await supabaseAdmin
-    .from("farms")
-    .select("owner_id, name, created_at, updated_at, plots, owner_email, owner_name")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Admin fetch users error:", error);
-    throw new Error(error.message);
-  }
-
-  // Map farms into user records
-  const users = (farms || []).map((farm: any) => ({
-    id: farm.owner_id,
-    email: farm.owner_email || "—",
-    name: farm.owner_name || farm.owner_id?.slice(0, 8) || "Unknown",
-    farmName: farm.name || "Unnamed Farm",
-    plotCount: Array.isArray(farm.plots) ? farm.plots.length : 0,
-    createdAt: farm.created_at,
-    updatedAt: farm.updated_at,
-  }));
-
-  return { users, count: users.length };
-}
-
-/**
- * Fetch a single user's complete farm data by owner_id.
- */
-export async function adminFetchUserDetailAction(ownerId: string) {
-  await validateAdminSession();
-
-  const { data: farm, error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("farms")
     .select("*")
-    .eq("owner_id", ownerId)
-    .single();
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Admin Fetch Farms failed:", error);
+    throw new Error(error.message);
+  }
+
+  return data || [];
+}
+
+/**
+ * Fetches the list of teammate emails with admin access.
+ */
+export async function fetchAdminTeammates() {
+  const session = await getServerSession(authOptions);
+  if (!session || (session as any).user?.role !== 'admin') {
+    throw new Error("Unauthorized: Admin access required.");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("admin_access")
+    .select("*")
+    .order("added_at", { ascending: false });
 
   if (error) {
     throw new Error(error.message);
   }
 
-  return { farm };
+  return data || [];
 }
 
 /**
- * Delete a user's farm record and associated data.
+ * Adds a new teammate email to the admin whitelist.
  */
-export async function adminDeleteUserDataAction(ownerId: string) {
-  await validateAdminSession();
+export async function addAdminTeammate(email: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session as any).user?.role !== 'admin') {
+    throw new Error("Unauthorized: Admin access required.");
+  }
 
   const { error } = await supabaseAdmin
-    .from("farms")
-    .delete()
-    .eq("owner_id", ownerId);
+    .from("admin_access")
+    .insert([{ email: email.toLowerCase(), added_at: new Date().toISOString() }]);
 
   if (error) {
     throw new Error(error.message);
@@ -106,29 +116,23 @@ export async function adminDeleteUserDataAction(ownerId: string) {
 }
 
 /**
- * Get platform-wide statistics.
+ * Removes a teammate email from the admin whitelist.
  */
-export async function adminGetPlatformStatsAction() {
-  await validateAdminSession();
+export async function removeAdminTeammate(email: string) {
+  const session = await getServerSession(authOptions);
+  if (!session || (session as any).user?.role !== 'admin') {
+    throw new Error("Unauthorized: Admin access required.");
+  }
 
-  const { data: farms, error } = await supabaseAdmin
-    .from("farms")
-    .select("owner_id, plots, updated_at");
+  // Prevent self-removal if the email is also the Root Admin in .env (though .env check happens first usually)
+  const { error } = await supabaseAdmin
+    .from("admin_access")
+    .delete()
+    .eq("email", email.toLowerCase());
 
   if (error) {
     throw new Error(error.message);
   }
 
-  const totalUsers = farms?.length || 0;
-  const totalPlots = (farms || []).reduce((sum: number, f: any) => {
-    return sum + (Array.isArray(f.plots) ? f.plots.length : 0);
-  }, 0);
-
-  // Users active in the last 7 days
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const activeUsers = (farms || []).filter(
-    (f: any) => f.updated_at && f.updated_at > sevenDaysAgo
-  ).length;
-
-  return { totalUsers, totalPlots, activeUsers };
+  return { success: true };
 }

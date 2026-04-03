@@ -11,5 +11,5 @@ export const ai = genkit({
         'dummy_key_for_mocking',
     }),
   ],
-  model: 'googleai/gemini-2.5-flash',
+  model: 'googleai/gemini-2.0-flash', // Upgraded to 2.0 Flash for superior reasoning & vision speed',
 });

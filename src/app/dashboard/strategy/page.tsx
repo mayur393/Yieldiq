@@ -34,6 +34,8 @@ import {
   FileText
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDemoMode } from "@/components/demo-provider";
+import { DEMO_DATA } from "@/lib/demo-data";
 
 import { useUser, useFarm } from "@/supabase";
 import { useSession } from "next-auth/react";
@@ -54,6 +56,7 @@ export default function CultivationStrategyPage() {
   const { user } = useUser();
   const userUid = user?.uid || (session?.user as any)?.id;
   const { data: farmData } = useFarm(userUid);
+  const { isDemoMode } = useDemoMode();
 
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -62,22 +65,56 @@ export default function CultivationStrategyPage() {
   const [isGeneratingDetail, setIsGeneratingDetail] = useState(false);
 
   const [recommendations, setRecommendations] = useState<RecommendationOutput | null>(null);
-  const [detailedStrategy, setDetailedStrategy] = useState<DetailedStrategyOutput | null>(null);
+  const [cachedStrategies, setCachedStrategies] = useState<Record<number, DetailedStrategyOutput>>({});
   const [selectedCropIdx, setSelectedCropIdx] = useState<number>(0);
 
   const [lastInputs, setLastInputs] = useState<any>(null);
 
+  // Persistence Key
+  const STRATEGY_CACHE_KEY = userUid ? `strategy_cache_${userUid}` : null;
+
+  // Hydrate from LocalStorage on mount
+  useEffect(() => {
+    if (!STRATEGY_CACHE_KEY || typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem(STRATEGY_CACHE_KEY);
+      if (stored) {
+        const { recommendations: storedRecs, cachedStrategies: storedStrats, lastInputs: storedInputs } = JSON.parse(stored);
+        if (storedRecs) setRecommendations(storedRecs);
+        if (storedStrats) setCachedStrategies(storedStrats);
+        if (storedInputs) setLastInputs(storedInputs);
+      }
+    } catch (e) {
+      console.error("Failed to hydrate strategy cache:", e);
+    }
+  }, [STRATEGY_CACHE_KEY]);
+
+  // Sync to LocalStorage when states change
+  useEffect(() => {
+    if (!STRATEGY_CACHE_KEY || typeof window === 'undefined') return;
+    if (recommendations || Object.keys(cachedStrategies).length > 0) {
+      const stateToStore = { recommendations, cachedStrategies, lastInputs };
+      localStorage.setItem(STRATEGY_CACHE_KEY, JSON.stringify(stateToStore));
+    }
+  }, [recommendations, cachedStrategies, lastInputs, STRATEGY_CACHE_KEY]);
+
   const handleGenerateInitial = async (values: StrategyFormValues) => {
     setIsGeneratingRecs(true);
-    setDetailedStrategy(null);
+    setCachedStrategies({});
     setRecommendations(null);
     try {
-      const result = await generateCultivationRecommendations(values);
-      setRecommendations(result.recommendations);
-      setLastInputs(result);
-
-      // Auto-load detail for the top match
-      await handleSelectCrop(0, result.recommendations.crop_recommendations[0].cropName, result);
+      if (isDemoMode) {
+        // Simulate loading
+        await new Promise(resolve => setTimeout(resolve, 800));
+        setRecommendations(DEMO_DATA.strategy.recommendations as any);
+        setLastInputs({ farm: DEMO_DATA.farm });
+        await handleSelectCrop(0, DEMO_DATA.strategy.recommendations.crop_recommendations[0].cropName, { farm: DEMO_DATA.farm });
+      } else {
+        const result = await generateCultivationRecommendations(values);
+        setRecommendations(result.recommendations);
+        setLastInputs(result);
+        await handleSelectCrop(0, result.recommendations.crop_recommendations[0].cropName, result);
+      }
 
       toast({
         title: "Recommendations Ready",
@@ -102,15 +139,26 @@ export default function CultivationStrategyPage() {
     if (!inputs) return;
 
     setSelectedCropIdx(idx);
+    
+    // Check if we already have this strategy cached
+    if (cachedStrategies[idx]) {
+      return; 
+    }
+
     setIsGeneratingDetail(true);
     try {
-      const result = await generateDetailedCropStrategy(
-        cropName,
-        inputs.farm,
-        inputs.weather,
-        inputs.waterReport
-      );
-      setDetailedStrategy(result.strategy);
+      if (isDemoMode) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setCachedStrategies(prev => ({ ...prev, [idx]: DEMO_DATA.strategy.detailed as any }));
+      } else {
+        const result = await generateDetailedCropStrategy(
+          cropName,
+          inputs.farm,
+          inputs.weather,
+          inputs.waterReport
+        );
+        setCachedStrategies(prev => ({ ...prev, [idx]: result.strategy }));
+      }
     } catch (error: any) {
       console.error(error);
       toast({
@@ -154,13 +202,24 @@ export default function CultivationStrategyPage() {
               <Button onClick={downloadAsPdf} variant="outline" size="sm" className="gap-2 border-primary/30 text-primary">
                 <Download className="h-4 w-4" /> Export PDF
               </Button>
-              <Button onClick={() => { setRecommendations(null); setDetailedStrategy(null); }} variant="outline" size="sm">
+              <Button onClick={() => { 
+                setRecommendations(null); 
+                setCachedStrategies({}); 
+                if (STRATEGY_CACHE_KEY) localStorage.removeItem(STRATEGY_CACHE_KEY);
+              }} variant="outline" size="sm">
                 New Analysis
               </Button>
             </>
           )}
         </div>
       </div>
+
+      {recommendations && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-lg border border-primary/20 text-[10px] w-fit font-medium text-primary mb-4">
+          <Zap className="h-3 w-3" />
+          Intellectual Cache: {Object.keys(cachedStrategies).length} Models Buffered
+        </div>
+      )}
 
       {isGeneratingRecs && (
         <div className="flex flex-col items-center justify-center py-24 space-y-4">
@@ -171,7 +230,12 @@ export default function CultivationStrategyPage() {
 
       {!recommendations && !isGeneratingRecs && (
         <div className="max-w-4xl mx-auto">
-          <StrategyForm onSubmit={handleGenerateInitial} isLoading={isGeneratingRecs} plots={farmData?.plots || []} locationName={farmData?.location || ""} />
+          <StrategyForm 
+            onSubmit={handleGenerateInitial} 
+            isLoading={isGeneratingRecs} 
+            plots={isDemoMode ? DEMO_DATA.farm.plots : (farmData?.plots || [])} 
+            locationName={isDemoMode ? DEMO_DATA.farm.location : (farmData?.location || "")} 
+          />
         </div>
       )}
 
@@ -274,9 +338,9 @@ export default function CultivationStrategyPage() {
           {isGeneratingDetail ? (
             <div className="flex flex-col items-center justify-center p-20 space-y-4 bg-muted/20 border-dashed border-2 rounded-xl">
               <Loader2 className="h-10 w-10 animate-spin text-accent" />
-              <p className="text-sm text-muted-foreground animate-pulse">Mapping ${activeCrop?.cropName} specific variables to climate models...</p>
+              <p className="text-sm text-muted-foreground animate-pulse">Mapping {activeCrop?.cropName} specific variables to climate models...</p>
             </div>
-          ) : detailedStrategy ? (
+          ) : cachedStrategies[selectedCropIdx] ? (
             <div className="space-y-6 animate-in slide-in-from-top-4 duration-500">
 
               <div className="flex items-center gap-2 px-2">
@@ -295,10 +359,10 @@ export default function CultivationStrategyPage() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-2">
-                      <h4 className="font-semibold text-sm">Irrigation ({detailedStrategy.input_plan.irrigation.method})</h4>
-                      <p className="text-xs text-muted-foreground">Freq: {detailedStrategy.input_plan.irrigation.frequency} | Dur: {detailedStrategy.input_plan.irrigation.duration}</p>
+                      <h4 className="font-semibold text-sm">Irrigation ({cachedStrategies[selectedCropIdx].input_plan.irrigation.method})</h4>
+                      <p className="text-xs text-muted-foreground">Freq: {cachedStrategies[selectedCropIdx].input_plan.irrigation.frequency} | Dur: {cachedStrategies[selectedCropIdx].input_plan.irrigation.duration}</p>
                       <p className="text-xs text-muted-foreground bg-blue-500/10 p-2 rounded text-blue-700 dark:text-blue-300">
-                        <strong>Critical Stage:</strong> {detailedStrategy.input_plan.irrigation.criticalStages}
+                        <strong>Critical Stage:</strong> {cachedStrategies[selectedCropIdx].input_plan.irrigation.criticalStages}
                       </p>
                     </div>
 
@@ -313,7 +377,7 @@ export default function CultivationStrategyPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {detailedStrategy.input_plan.fertilizerSchedule.map((fert, i) => (
+                          {cachedStrategies[selectedCropIdx].input_plan.fertilizerSchedule.map((fert, i) => (
                             <TableRow key={i}>
                               <TableCell className="font-medium">{fert.stage}</TableCell>
                               <TableCell>{fert.fertilizer}</TableCell>
@@ -338,7 +402,7 @@ export default function CultivationStrategyPage() {
                     </CardHeader>
                     <CardContent className="pt-4">
                       <div className="space-y-2 text-sm">
-                        {detailedStrategy.economics.itemizedCosts.map((item, i) => (
+                        {cachedStrategies[selectedCropIdx].economics.itemizedCosts.map((item, i) => (
                           <div key={i} className="flex justify-between border-b border-muted/30 pb-1">
                             <span className="text-muted-foreground">{item.item}</span>
                             <span>₹{item.costPerAcre.toLocaleString()}</span>
@@ -346,17 +410,17 @@ export default function CultivationStrategyPage() {
                         ))}
                         <div className="flex justify-between pt-2 font-bold text-destructive">
                           <span>Total Input Cost</span>
-                          <span>₹{detailedStrategy.economics.totalInputCost.toLocaleString()}</span>
+                          <span>₹{cachedStrategies[selectedCropIdx].economics.totalInputCost.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between font-bold text-primary">
                           <span>Expected Revenue</span>
-                          <span>₹{detailedStrategy.economics.expectedRevenue.toLocaleString()}</span>
+                          <span>₹{cachedStrategies[selectedCropIdx].economics.expectedRevenue.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between pt-2 font-black text-green-600 text-lg border-t mt-2">
                           <span>Net Profit</span>
-                          <span>₹{detailedStrategy.economics.netProfit.toLocaleString()}</span>
+                          <span>₹{cachedStrategies[selectedCropIdx].economics.netProfit.toLocaleString()}</span>
                         </div>
-                        <div className="text-[10px] text-right text-muted-foreground">ROI: {detailedStrategy.economics.roi}</div>
+                        <div className="text-[10px] text-right text-muted-foreground">ROI: {cachedStrategies[selectedCropIdx].economics.roi}</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -370,7 +434,7 @@ export default function CultivationStrategyPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-4 space-y-3">
-                      {detailedStrategy.action_checklist.map((item, i) => (
+                      {cachedStrategies[selectedCropIdx].action_checklist.map((item, i) => (
                         <div key={i} className="flex gap-3 items-start">
                           <div className="bg-accent/20 text-accent-foreground h-5 w-5 rounded flex items-center justify-center shrink-0 text-[10px] font-bold">
                             {i + 1}
@@ -397,7 +461,7 @@ export default function CultivationStrategyPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {detailedStrategy.pest_management.map((pest, i) => (
+                    {cachedStrategies[selectedCropIdx].pest_management.map((pest, i) => (
                       <div key={i} className="border border-destructive/10 rounded-lg p-3 bg-card space-y-2">
                         <h4 className="font-bold text-sm text-destructive flex items-center gap-1">
                           <AlertTriangle className="h-3 w-3" />
@@ -425,11 +489,11 @@ export default function CultivationStrategyPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {detailedStrategy.cultivation_calendar.map((step, idx) => (
+                    {cachedStrategies[selectedCropIdx].cultivation_calendar.map((step, idx) => (
                       <div key={idx} className="flex gap-4">
                         <div className="flex flex-col items-center mt-1">
                           <div className="h-3 w-3 rounded-full bg-purple-500 ring-4 ring-purple-500/20" />
-                          {idx !== detailedStrategy.cultivation_calendar.length - 1 && (
+                          {idx !== cachedStrategies[selectedCropIdx].cultivation_calendar.length - 1 && (
                             <div className="w-px h-full bg-border mt-1" />
                           )}
                         </div>
