@@ -97,11 +97,8 @@ Your job is to provide conversational, precise, and actionable advice.
       if (!output) throw new Error("Consultant failed to generate response.");
       return output;
     } catch (e: any) {
-      console.error("consultantFlow Error:", e.message || e);
-      return {
-        message: "⚠️ AI Consultant Error: The configured Gemini API key is invalid or expired. Please update it in `.env.local` to receive plot-specific advice.",
-        actionPlan: []
-      };
+      console.error("consultantFlow Error:", e);
+      throw new Error("AI Processing Failed: " + e.message);
     }
   }
 );

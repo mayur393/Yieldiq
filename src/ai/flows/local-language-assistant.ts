@@ -44,18 +44,11 @@ const localLanguageAssistantFlow = ai.defineFlow(
     outputSchema: LocalLanguageAssistantOutputSchema,
   },
   async input => {
-    try {
-      const { output } = await prompt({ query: input.query });
-      
-      if (!output) {
-        throw new Error("Assistant failed to generate response.");
-      }
-      return output;
-    } catch (error: any) {
-      console.error("Local Language Assistant Error:", error.message || error);
-      return {
-        response: `⚠️ AI Agent Error: The Gemini API key configured in the environment is invalid or expired. To fix the agent, please update the API key in .env.local.\n\n(Mocking response for query: "${input.query}")`
-      };
+    const { output } = await prompt({ query: input.query });
+    
+    if (!output) {
+      throw new Error("Assistant failed to generate response.");
     }
+    return output;
   }
 );
