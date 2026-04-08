@@ -1,51 +1,67 @@
 # YieldIQ Local Setup Guide
 
-Welcome to YieldIQ! This guide will help you get the project running locally on your machine with all features (Auth, Firestore, and AI) fully functional.
+Welcome to YieldIQ! This guide will help you configure your local development environment to run the complete platform, including Supabase integrations, NextAuth, and the AI features.
 
 ## 1. Prerequisites
 - **Node.js**: v18 or higher.
-- **Firebase Account**: Access to [Firebase Console](https://console.firebase.google.com/).
-- **Google AI API Key**: Get one from [Google AI Studio](https://aistudio.google.com/).
+- **Supabase Account**: Access to [Supabase](https://supabase.com/) to create a new project.
+- **Google Cloud Console**: For setting up Google OAuth credentials.
+- **Google AI Studio**: To obtain a Gemini API Key.
 
-## 2. Firebase Configuration
-1. Go to the [Firebase Console](https://console.firebase.google.com/).
-2. Create a new project (or use the one provided in `src/firebase/config.ts`).
-3. **Enable Authentication**:
-   - Go to Auth -> Sign-in method.
-   - Enable **Email/Password**.
-   - Enable **Google** (Sign-in with Gmail).
-4. **Enable Firestore**:
-   - Create a database in **Production Mode** (rules will be applied from your `firestore.rules` file).
-5. **Authorized Domains**:
-   - In Auth -> Settings -> Authorized domains, ensure `localhost` is listed.
+## 2. Infrastructure Configuration
+
+### Supabase Setup
+1. Create a new project in your Supabase dashboard.
+2. Initialize your database schema (refer to `supabase/migrations` if available).
+3. Retrieve your Project URL, Anon Key, and Service Role Key from **Project Settings > API**.
+
+### Google Auth (NextAuth) Setup
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a new project and set up the **OAuth consent screen**.
+3. Create **OAuth 2.0 Client IDs** under Credentials. 
+4. Add `http://localhost:9002/api/auth/callback/google` to the Authorized redirect URIs.
+
+### AI Configuration
+1. Go to [Google AI Studio](https://aistudio.google.com/).
+2. Generate an API Key for Gemini.
 
 ## 3. Environment Variables
-Rename `.env` to `.env.local` or update `.env` with:
-- `GOOGLE_GENAI_API_KEY`: Your Gemini API key.
-- The Firebase config in `src/firebase/config.ts` is already populated for the Studio project, but you can update it if you create your own.
+Create a `.env.local` file in the root directory and populate it with your credentials:
+
+```env
+# NextAuth Configuration
+NEXTAUTH_URL="http://localhost:9002"
+NEXTAUTH_SECRET="<generate-a-secure-random-string>"
+
+# Google OAuth Credentials
+GOOGLE_CLIENT_ID="<your-google-client-id>"
+GOOGLE_CLIENT_SECRET="<your-google-client-secret>"
+
+# Supabase Credentials
+NEXT_PUBLIC_SUPABASE_URL="<your-supabase-url>"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="<your-supabase-anon-key>"
+SUPABASE_SERVICE_ROLE_KEY="<your-supabase-service-role-key>"
+
+# AI Identity & Services
+GOOGLE_GENAI_API_KEY="<your-gemini-api-key>"
+GEMINI_API_KEY="<your-gemini-api-key>"
+
+# Admin Whitelist (comma-separated emails for the Admin Dashboard)
+ADMIN_EMAILS="your-email@gmail.com"
+```
 
 ## 4. Run the Project
-```bash
-npm install
-npm run dev
-```
-The app will be available at `http://localhost:9002`.
+1. Install node modules (if you haven't already):
+   ```bash
+   npm install
+   ```
+2. Start the Turbopack development server on port 9002:
+   ```bash
+   npm run dev
+   ```
+3. Open `http://localhost:9002` in your browser.
 
----
-
-## 🤖 Prompt for Antigravity AI (Copy-Paste this!)
-
-> "I have just downloaded the YieldIQ project. Please help me set it up:
-> 1. Check if dependencies are installed, if not, run `npm install`.
-> 2. Look at `.env` and tell me which keys I need to fill in.
-> 3. Verify that the Firebase config in `src/firebase/config.ts` is correctly imported in `src/firebase/index.ts`.
-> 4. Ensure the Google Sign-In button in `src/app/login/page.tsx` is configured to use the local auth instance.
-> 5. Once keys are provided, run the development server for me."
-
----
-
-## 5. Troubleshooting Google Sign-In
-If Google Sign-In fails locally:
-1. Ensure the `apiKey` and `authDomain` in `src/firebase/config.ts` match your Firebase Project.
-2. Check that you've enabled the Google provider in the Firebase Console.
-3. Make sure you are running on `localhost` (port 9002 by default in this project).
+## 5. Troubleshooting
+- **API Key Errors in AI Agents**: If the AI Assistant shows `"⚠️ AI Agent Error"`, ensure your `GOOGLE_GENAI_API_KEY` is valid and not expired. The agents will automatically default to a safe UI fallback rather than throwing an error.
+- **Google Sign-In Failing**: Verify that your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are exactly correct, and ensure NextAuth callbacks point to `http://localhost:9002`.
+- **Database Access Errors**: Confirm that your Supabase Row Level Security (RLS) policies permit access for your authenticated NextAuth user.

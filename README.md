@@ -1,58 +1,45 @@
 # 🌾 YieldIQ
 
-**AI-Powered Agricultural Intelligence for the Modern Farmer**
+**AI-Powered Precision Agriculture & Farm Management Platform**
 
-YieldIQ is a scientifically-backed precision agriculture platform designed to empower farmers with data-driven insights. By combining Google Gemini's advanced parsing capabilities with established agronomy models (FAO-56 & Maas-Hoffman), YieldIQ transforms raw lab reports and real-time telemetry into actionable harvest forecasts and irrigation schedules.
+YieldIQ is an enterprise-grade precision agriculture platform designed to empower farmers and agronomists with data-driven insights. Transitioning from hackathon concept to a production-ready system, YieldIQ combines advanced generative AI with a robust multi-plot architecture to deliver actionable harvest forecasts, automated agronomic strategies, and streamlined farm administration.
 
 ## 🚀 Key Features
 
-- **🔬 Scientific Advisory**: Automatically parse IS-10500 water/soil reports to calculate salinity penalties, sodicity hazards (SAR/RSC), and soil structural risks.
-- **📈 Harvest Forecasting**: High-accuracy yield predictions based on soil type, crop variety, and real-time weather conditions from Open-Meteo.
-- **💧 Dynamic Irrigation**: Live irrigation scheduling derived from ETo (Evapotranspiration) and crop-specific coefficients (Kc).
-- **📡 Intelligence Pipeline**: Visualize the flow of data from edge sensors through standardization and normalization into AI insights.
-- **🗣️ Multilingual Assistant**: A conversational AI that speaks the farmer's language (Hindi, Marathi, English) to provide expert guidance.
-- **🗺️ GIS Visualization**: Satellite-level insights including NDVI health indexing and moisture mapping.
+- **🧠 Expert AI Agronomist**: Generates precision-driven 8-part cultivation strategies, economic P&L projections, GDD-based calendars, and integrated pest management plans using Gemini 2.0 Flash and Genkit.
+- **🗣️ Multilingual Assistant**: A conversational AI capable of answering queries in regional Indian languages (Hindi, Marathi) and English.
+- **📊 Dynamic Multi-Plot Architecture**: Robust tracking of farm acreage and individual plot details across cloud (Supabase) and local storage.
+- **🔬 Smart Lab Report Parsing**: Streamlined interface for uploading/assigning plot-specific lab reports, automatically driving AI-generated recommendations.
+- **🛡️ Secure Admin Dashboard**: Startup-grade command center with Role-Based Access Control (RBAC), global farm monitoring, and secure user management.
+- **🗺️ Interactive Data Dashboards**: Real-time visualization using Recharts for harvest tracking, forecasting, and resource mapping.
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS, ShadCN UI.
-- **Backend**: Firebase (Authentication, Firestore).
-- **Generative AI**: Google Genkit 1.x, Gemini 2.5 Flash.
-- **Data APIs**: Open-Meteo (Weather & Hydrology).
-- **Charts**: Recharts.
+- **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS, ShadCN UI
+- **Backend/Database**: Supabase (PostgreSQL, Cloud Storage)
+- **Authentication**: NextAuth.js (Google OAuth, secure RBAC via email whitelisting)
+- **Generative AI**: Google Genkit 1.x, Google Gemini 2.0 Flash
+- **Charts & Mapping**: Recharts, Leaflet
+- **Deployment**: Vercel
 
-## 📦 Local Setup
+## 📦 Quick Start
+
+Refer to the [SETUP_GUIDE.md](./SETUP_GUIDE.md) for comprehensive local installation and environment instructions.
 
 1. **Clone the repository**:
    ```bash
    git clone <your-repo-url>
    cd yieldiq
    ```
-
 2. **Install dependencies**:
    ```bash
    npm install
    ```
-
-3. **Configure Environment Variables**:
-   Create a `.env.local` file and add your Google AI API Key:
-   ```env
-   GOOGLE_GENAI_API_KEY=your_key_here
-   ```
-
-4. **Run the development server**:
+3. **Start Development Server**:
    ```bash
    npm run dev
    ```
-   Open [http://localhost:9002](http://localhost:9002) to view the dashboard.
 
-## 🚀 Deployment
-
-For detailed instructions on how to deploy this project to **GitHub** and **Vercel**, please refer to the [Deployment Guide](file:///c:/Users/mayur/Desktop/Yieldiq/DEPLOYMENT.md).
-
-## 📄 License
+## 📄 License & Status
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-*Built for the Hackathon - Empowering Agriculture through AI.*
