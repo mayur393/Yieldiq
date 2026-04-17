@@ -1,7 +1,7 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { checkIsAdminAction } from "@/app/actions/admin";
+import { isAdminEmail } from "@/lib/admin-check";
 
 export const authOptions: any = {
   providers: [
@@ -53,8 +53,8 @@ export const authOptions: any = {
         token.id = user.id;
         token.email = user.email;
         
-        // Initial Admin Check
-        const isAdmin = await checkIsAdminAction(user.email);
+        // Initial Admin Check (uses plain utility, safe for API route context)
+        const isAdmin = await isAdminEmail(user.email);
         if (isAdmin) {
           token.role = 'admin';
         }

@@ -3,6 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { isAdminEmail } from "@/lib/admin-check";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -16,40 +17,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
 });
 
 /**
- * Checks if an email is authorized for admin access.
- * Whitelists emails from .env and the `admin_access` table.
+ * Server Action wrapper for admin email check.
  */
 export async function checkIsAdminAction(email: string | null | undefined) {
-  if (!email) return false;
-
-  // 1. Check Hardcoded Admins (from .env)
-  const envAdmins = (process.env.ADMIN_EMAILS || "").split(",").map(e => e.trim().toLowerCase());
-  console.log(`[Admin Debug] Checking: ${email} against:`, envAdmins);
-  
-  if (envAdmins.includes(email.toLowerCase())) {
-    console.log(`[Admin Debug] Match found in .env!`);
-    return true;
-  }
-
-  // 2. Check Database Whitelist (admin_access table)
-  try {
-    const { data, error } = await supabaseAdmin
-      .from("admin_access")
-      .select("email")
-      .eq("email", email.toLowerCase())
-      .single();
-
-    if (!error && data) {
-       console.log(`[Admin Debug] Match found in DB!`);
-       return true;
-    }
-    if (error) console.log(`[Admin Debug] DB Error or No Match:`, error.message);
-  } catch (e) {
-    console.error("Admin check failed (DB):", e);
-  }
-
-  console.log(`[Admin Debug] No admin match found for ${email}`);
-  return false;
+  return isAdminEmail(email);
 }
 
 /**
