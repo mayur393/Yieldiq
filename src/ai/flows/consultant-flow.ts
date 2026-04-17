@@ -89,9 +89,12 @@ Your job is to provide conversational, precise, and actionable advice.
 
     try {
       const { output } = await ai.generate({
-        model: 'googleai/gemini-2.0-flash', // Upgraded for state-of-the-art vision & response speed
+        model: 'groq/llama-3.3-70b-versatile',
         prompt: promptParts,
-        output: { schema: ConsultantOutputSchema },
+        output: { 
+          schema: ConsultantOutputSchema,
+          format: 'json'
+        },
       });
       
       if (!output) throw new Error("Consultant failed to generate response.");

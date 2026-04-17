@@ -29,10 +29,13 @@ export async function localLanguageAssistant(input: LocalLanguageAssistantInput)
 const prompt = ai.definePrompt({
   name: 'localLanguageAssistantPrompt',
   input: {schema: LocalLanguageAssistantInputSchema},
-  output: {schema: LocalLanguageAssistantOutputSchema},
+  output: {
+    schema: LocalLanguageAssistantOutputSchema,
+    format: 'json'
+  },
   prompt: `You are a helpful and knowledgeable agricultural assistant named YieldIQ. Your primary goal is to provide immediate, relevant, and easy-to-understand advice to farmers regarding their farming practices. You should be able to understand and respond in local Indian languages like Hindi and Marathi, as well as English. The farmer's input will be in their preferred language.
 
-Be concise and focus on practical, actionable advice.
+Be concise and focus on practical, actionable advice. YOU MUST RETURN A VALID RAW JSON OBJECT matching the expected schema. Do not wrap in markdown blocks.
 
 Farmer's Query: {{{query}}}`,
 });
@@ -44,11 +47,12 @@ const localLanguageAssistantFlow = ai.defineFlow(
     outputSchema: LocalLanguageAssistantOutputSchema,
   },
   async input => {
-    const { output } = await prompt({ query: input.query });
+    const result = await prompt({ query: input.query });
     
-    if (!output) {
-      throw new Error("Assistant failed to generate response.");
+    if (!result.output) {
+      console.error("Assistant generation failed. Raw text:", result.text);
+      throw new Error(`Assistant failed to generate response. Raw text: ${result.text}`);
     }
-    return output;
+    return result.output;
   }
 );
